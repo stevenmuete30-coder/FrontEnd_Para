@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Posts - Mi Blog</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="container">
+                <h1 class="logo"><a href="../index.html" style="color: white; text-decoration: none;">Mi Blog</a></h1>
+                <ul class="nav-links">
+                    <li><a href="../index.html">Inicio</a></li>
+                    <li><a href="posts.html">Posts</a></li>
+                    <li id="auth-links">
+                        <a href="login.html">Iniciar Sesión</a>
+                        <a href="register.html">Registrarse</a>
+                    </li>
+                    <li id="user-links" style="display: none;">
+                        <span id="user-nickname"></span>
+                        <button id="logout-btn">Cerrar Sesión</button>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin: 30px 0;">
+            <h2>Todos los Posts</h2>
+            <button id="new-post-btn" class="btn" style="display: none;">Crear Post</button>
+        </div>
+
+        <div id="posts-container" class="posts-grid">
+            <p>Cargando posts...</p>
+        </div>
+    </main>
+
+    <script type="module">
+        import { api } from '../js/api.js';
+        import { auth } from '../js/auth.js';
+
+        const postsContainer = document.getElementById('posts-container');
+        const newPostBtn = document.getElementById('new-post-btn');
+        const authLinks = document.getElementById('auth-links');
+        const userLinks = document.getElementById('user-links');
+        const userNickname = document.getElementById('user-nickname');
+        const logoutBtn = document.getElementById('logout-btn');
+
+        if (auth.estaAutenticado()) {
+            const usuario = auth.obtenerUsuario();
+            authLinks.style.display = 'none';
+            userLinks.style.display = 'flex';
+            userNickname.textContent = `Hola, ${usuario.nickname}`;
+            newPostBtn.style.display = 'block';
+        }
+
+        async function cargarPosts() {
+            try {
+                const posts = await api.obtenerPosts(50, 1);
+                
+                if (posts.length === 0) {
+                    postsContainer.innerHTML = '<p>No hay posts disponibles.</p>';
+                    return;
+                }
+
+                postsContainer.innerHTML = posts.map(post => `
+                    <div class="post-card">
+                        <h4>${post.titulo}</h4>
+                        <div class="post-meta">
+                            Por ${post.autor || 'Anónimo'} | ${new Date(post.fecha_publicacion).toLocaleDateString()}
+                            ${post.categoria ? `| ${post.categoria}` : ''}
+                        </div>
+                        <p class="post-excerpt">${post.contenido.substring(0, 150)}...</p>
+                        <a href="post-detail.html?id=${post.id}" class="btn">Leer más</a>
+                    </div>
+                `).join('');
+            } catch (error) {
+                postsContainer.innerHTML = '<p>Error al cargar los posts.</p>';
+                console.error('Error:', error);
+            }
+        }
+
+        newPostBtn?.addEventListener('click', () => {
+            window.location.href = 'create-post.html';
+        });
+
+        logoutBtn?.addEventListener('click', () => {
+            auth.cerrarSesion();
+        });
+
+        cargarPosts();
+    </script>
+</body>
+</html>

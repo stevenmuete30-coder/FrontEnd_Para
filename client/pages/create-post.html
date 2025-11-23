@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crear Post - Mi Blog</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="container">
+                <h1 class="logo"><a href="../index.html" style="color: inherit; text-decoration: none;">Mi Blog</a></h1>
+                <ul class="nav-links">
+                    <li><a href="../index.html">Inicio</a></li>
+                    <li><a href="posts.html">Posts</a></li>
+                </ul>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container">
+        <div class="form-container" style="max-width: 800px;">
+            <h2>Crear Nuevo Post</h2>
+            <form id="create-post-form">
+                <div class="form-group">
+                    <label for="usuario_id">Usuario *</label>
+                    <select id="usuario_id" name="usuario_id" required>
+                        <option value="">Selecciona un usuario...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="titulo">Título *</label>
+                    <input type="text" id="titulo" name="titulo" placeholder="Escribe un título atractivo..." required>
+                </div>
+
+                <div class="form-group">
+                    <label for="categoria_id">Categoría</label>
+                    <select id="categoria_id" name="categoria_id">
+                        <option value="">Sin categoría</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="contenido">Contenido *</label>
+                    <textarea id="contenido" name="contenido" placeholder="Escribe el contenido de tu post..." required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="etiquetas">Etiquetas (opcional)</label>
+                    <select id="etiquetas" name="etiquetas" multiple style="height: 120px;">
+                    </select>
+                    <small style="color: var(--gray); margin-top: 5px; display: block;">Mantén presionado Ctrl para seleccionar múltiples etiquetas</small>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn" style="flex: 1;">Publicar Post</button>
+                    <a href="posts.html" class="btn" style="flex: 1; text-align: center; background: linear-gradient(135deg, var(--gray), #475569);">Cancelar</a>
+                </div>
+                
+                <div id="message"></div>
+            </form>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Mi Blog. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+    <script type="module">
+        import { api } from '../js/api.js';
+
+        const createPostForm = document.getElementById('create-post-form');
+        const messageDiv = document.getElementById('message');
+        const usuarioSelect = document.getElementById('usuario_id');
+        const categoriaSelect = document.getElementById('categoria_id');
+        const etiquetasSelect = document.getElementById('etiquetas');
+
+        async function cargarUsuarios() {
+            try {
+                const usuarios = await api.obtenerUsuarios();
+                usuarioSelect.innerHTML = '<option value="">Selecciona un usuario...</option>' +
+                    usuarios.map(u => `<option value="${u.id}">${u.nickname} (@${u.login})</option>`).join('');
+            } catch (error) {
+                console.error('Error al cargar usuarios:', error);
+            }
+        }
+
+        async function cargarCategorias() {
+            try {
+                const categorias = await api.obtenerCategorias();
+                categoriaSelect.innerHTML = '<option value="">Sin categoría</option>' +
+                    categorias.map(c => `<option value="${c.id}">${c.nombre_categoria}</option>`).join('');
+            } catch (error) {
+                console.error('Error al cargar categorías:', error);
+            }
+        }
+
+        async function cargarEtiquetas() {
+            try {
+                const etiquetas = await api.obtenerEtiquetas();
+                etiquetasSelect.innerHTML = etiquetas.map(e => 
+                    `<option value="${e.id}">${e.nombre_etiqueta}</option>`
+                ).join('');
+            } catch (error) {
+                console.error('Error al cargar etiquetas:', error);
+            }
+        }
+
+        createPostForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            messageDiv.textContent = '';
+
+            const datos = {
+                titulo: document.getElementById('titulo').value,
+                contenido: document.getElementById('contenido').value,
+                usuario_id: parseInt(document.getElementById('usuario_id').value),
+                categoria_id: document.getElementById('categoria_id').value || null
+            };
+
+            if (!datos.usuario_id) {
+                messageDiv.className = 'error-message';
+                messageDiv.textContent = 'Por favor selecciona un usuario';
+                return;
+            }
+
+            try {
+                const resultado = await api.crearPost(datos);
+                
+                if (resultado.error) {
+                    messageDiv.className = 'error-message';
+                    messageDiv.textContent = resultado.error;
+                } else {
+                    const etiquetasSeleccionadas = Array.from(etiquetasSelect.selectedOptions).map(o => o.value);
+                    
+                    for (const etiquetaId of etiquetasSeleccionadas) {
+                        try {
+                            await fetch(`http://localhost:3000/api/posts/${resultado.postId}/etiquetas`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ etiqueta_id: parseInt(etiquetaId) })
+                            });
+                        } catch (err) {
+                            console.error('Error al agregar etiqueta:', err);
+                        }
+                    }
+
+                    messageDiv.className = 'success-message';
+                    messageDiv.textContent = '¡Post creado exitosamente! Redirigiendo...';
+                    
+                    setTimeout(() => {
+                        window.location.href = `post-detail.html?id=${resultado.postId}`;
+                    }, 1500);
+                }
+            } catch (error) {
+                messageDiv.className = 'error-message';
+                messageDiv.textContent = 'Error al crear el post. Intenta de nuevo.';
+                console.error('Error:', error);
+            }
+        });
+        cargarUsuarios();
+        cargarCategorias();
+        cargarEtiquetas();
+    </script>
+</body>
+</html>

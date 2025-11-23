@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Post - Mi Blog</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="container">
+                <h1 class="logo"><a href="../index.html" style="color: inherit; text-decoration: none;">Mi Blog</a></h1>
+                <ul class="nav-links">
+                    <li><a href="../index.html">Inicio</a></li>
+                    <li><a href="posts.html">Posts</a></li>
+                </ul>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container">
+        <div id="post-container">
+            <p style="color: white;">Cargando post...</p>
+        </div>
+
+        <div class="comments-section" id="comments-section">
+            <h3>Comentarios</h3>
+            <div id="comment-form-container">
+                <form id="comment-form" style="margin-bottom: 30px;">
+                    <div class="form-group">
+                        <label for="comment-usuario">Usuario</label>
+                        <select id="comment-usuario" required>
+                            <option value="">Selecciona un usuario...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <textarea id="comment-body" placeholder="Escribe tu comentario..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn">Publicar Comentario</button>
+                </form>
+            </div>
+            <div id="comments-list"></div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Mi Blog. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+    <script type="module">
+        import { api } from '../js/api.js';
+
+        const postContainer = document.getElementById('post-container');
+        const commentsList = document.getElementById('comments-list');
+        const commentForm = document.getElementById('comment-form');
+        const commentUsuario = document.getElementById('comment-usuario');
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const postId = urlParams.get('id');
+
+        async function cargarUsuarios() {
+            try {
+                const usuarios = await api.obtenerUsuarios();
+                commentUsuario.innerHTML = '<option value="">Selecciona un usuario...</option>' +
+                    usuarios.map(u => `<option value="${u.id}">${u.nickname} (@${u.login})</option>`).join('');
+            } catch (error) {
+                console.error('Error al cargar usuarios:', error);
+            }
+        }
+
+        async function cargarPost() {
+            try {
+                const post = await api.obtenerPost(postId);
+                
+                if (post.error) {
+                    postContainer.innerHTML = '<p style="color: white;">Post no encontrado.</p>';
+                    return;
+                }
+
+                const etiquetasHTML = post.etiquetas && post.etiquetas.length > 0
+                    ? `<div class="tags">${post.etiquetas.map(e => `<span class="tag">${e.nombre_etiqueta}</span>`).join('')}</div>`
+                    : '';
+
+                postContainer.innerHTML = `
+                    <div class="post-detail">
+                        <h2>${post.titulo}</h2>
+                        <div class="post-meta">
+                            <span>${post.autor || 'Anónimo'}</span>
+                            <span>${new Date(post.fecha_publicacion).toLocaleDateString('es-ES')}</span>
+                            ${post.categoria ? `<span>${post.categoria}</span>` : ''}
+                        </div>
+                        ${etiquetasHTML}
+                        <div class="post-content">
+                            ${post.contenido.replace(/\n/g, '<br>')}
+                        </div>
+                    </div>
+                `;
+
+                cargarComentarios();
+            } catch (error) {
+                postContainer.innerHTML = '<p style="color: white;">Error al cargar el post.</p>';
+                console.error('Error:', error);
+            }
+        }
+
+        async function cargarComentarios() {
+            try {
+                const comentarios = await api.obtenerComentariosPorPost(postId);
+                
+                if (comentarios.length === 0) {
+                    commentsList.innerHTML = '<p>No hay comentarios aún. ¡Sé el primero en comentar!</p>';
+                    return;
+                }
+
+                commentsList.innerHTML = comentarios.map(c => `
+                    <div class="comment">
+                        <div class="comment-author">👤 ${c.autor}</div>
+                        <div class="comment-body">${c.cuerpo_comentario.replace(/\n/g, '<br>')}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                commentsList.innerHTML = '<p>Error al cargar comentarios.</p>';
+            }
+        }
+
+        commentForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const body = document.getElementById('comment-body').value;
+            const usuario_id = commentUsuario.value;
+
+            if (!usuario_id) {
+                alert('Por favor selecciona un usuario');
+                return;
+            }
+
+            try {
+                const resultado = await api.crearComentario({
+                    cuerpo_comentario: body,
+                    post_id: postId,
+                    usuario_id: parseInt(usuario_id)
+                });
+
+                if (!resultado.error) {
+                    document.getElementById('comment-body').value = '';
+                    cargarComentarios();
+                } else {
+                    alert('Error: ' + resultado.error);
+                }
+            } catch (error) {
+                alert('Error al publicar comentario');
+                console.error(error);
+            }
+        });
+
+        if (postId) {
+            cargarPost();
+            cargarUsuarios();
+        } else {
+            postContainer.innerHTML = '<p style="color: white;">Post no especificado.</p>';
+        }
+    </script>
+</body>
+</html>
